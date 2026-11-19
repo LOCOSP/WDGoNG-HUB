@@ -20,7 +20,8 @@ RULES = (
     ("txt",  "Scanning and attacking networks or devices without the owner's"),
     ("txt",  "permission is illegal in most places. That part is on you."),
     ("",     ""),
-    ("warn", "Extras are written by their authors - not by LOCOSP."),
+    ("success", "Official extras (green LOCOSP) come from LOCOSP."),
+    ("warn", "All others are written by their own authors - not by LOCOSP."),
     ("txt",  "They are reviewed and run in a sandbox, but you install and run"),
     ("txt",  "them at your own risk. Read what an extra asks for before you allow it."),
     ("",     ""),
@@ -102,5 +103,5 @@ class Extra:
     def _lines(ctx, lines, x, y, size, step):
         for color, s in lines:
             if s:
-                ctx.text(s, x, y, size, color, bold=(color in ("warn", "ice")))
+                ctx.text(s, x, y, size, color, bold=(color in ("warn", "ice", "success")))
             y += step

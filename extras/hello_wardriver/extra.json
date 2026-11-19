@@ -3,7 +3,7 @@
     "id": "hello_wardriver",
     "name": "Hello Wardriver",
     "author": "LOCOSP",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "api": 2,
     "entry": "main:Extra",
     "permissions": [],
@@ -11,7 +11,7 @@
     "category": "tools",
     "tags": ["intro", "guide", "rules", "example"],
     "description": "Start here: what extras are, the rules, and how to write your own.",
-    "about": "A three-page welcome card. Page 1 shows the logo and says what extras are. Page 2 is the ground rules: use your own gear or gear you are allowed to test, extras are written by their authors and run at your own risk. Page 3 is a short how-to for writing and publishing an extra. Asks for no permissions and touches no hardware. It is also the reference example for drawing images: ctx.image() with two small PNG files shipped in the extra's folder.",
+    "about": "A three-page welcome card. Page 1 shows the logo and says what extras are. Page 2 is the ground rules: use your own gear or gear you are allowed to test, official extras come from LOCOSP, all others are written by their own authors and run at your own risk. Page 3 is a short how-to for writing and publishing an extra. Asks for no permissions and touches no hardware. It is also the reference example for drawing images: ctx.image() with two small PNG files shipped in the extra's folder.",
     "homepage": ""
   }
 }
