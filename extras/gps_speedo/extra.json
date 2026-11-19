@@ -1,0 +1,17 @@
+{
+  "extra": {
+    "id": "gps_speedo",
+    "name": "GPS Speedometer",
+    "author": "WDGo",
+    "version": "1.0.0",
+    "api": 1,
+    "entry": "main:Extra",
+    "permissions": ["gps"],
+    "hardware": ["gps"],
+    "category": "tools",
+    "tags": ["gps", "speed", "navigation"],
+    "description": "Live speed + heading from your GPS fix.",
+    "about": "Shows your current ground speed in km/h and a compass heading, computed from successive GPS fixes (haversine between the last two positions over elapsed time). Requires a valid GPS fix; shows satellite count and raw lat/lon at the bottom. A reference extra demonstrating the one-shot sensor-read shape of the EXTRAS ctx API: ctx.gps.fix(), ctx.now(), drawing and keyboard input. Press [R] to reset the smoothed speed.",
+    "homepage": ""
+  }
+}

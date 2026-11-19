@@ -1,0 +1,17 @@
+{
+  "extra": {
+    "id": "key_copier",
+    "name": "Key Copier",
+    "author": "WDGo",
+    "version": "1.3.0",
+    "api": 1,
+    "entry": "main:Extra",
+    "permissions": ["loot_write"],
+    "hardware": [],
+    "category": "tools",
+    "tags": ["locksmith", "key", "bitting", "security", "physical"],
+    "description": "1:1 pin-tumbler key bitting tracer & editor.",
+    "about": "A 1:1 physical-key bitting tracer/editor, inspired by the Flipper Zero KeyCopier app (zinongli/KeyCopier). Like the Flipper app, the key blade is drawn at TRUE physical size so you can lay a real key on the screen, align its shoulder to the reference line, and trace or read its cuts. Pick a keyway (Kwikset KW1, Schlage SC1/SC4, Yale Y1, Master M1, Weiser WR5); each uses its real cut spacing and depth step. Set the cut depth at each pin and see the blade drawn to scale with the numeric bitting code, with MACS (Maximum Adjacent Cut Specification) validation. Because exact screen DPI/scaling varies, the scale is calibratable with +/- against an on-screen '10 mm' bar you check with a ruler, then it is truly 1:1. Bittings (and your calibration) are saved per keyway to the extra's own storage. You can also export a named text report of the current key to the game's loot folder (loot/extras/key_copier/) with the loot_write permission. Controls: Left/Right pick a pin, Up/Down change depth, F cycles keyway, +/- calibrate scale, S/L store/load in the extra, W save a named report to loot, R reset. Depth/spacing/MACS values are approximate references for learning — verify against a real manufacturer depth-and-spacing chart before cutting anything.",
+    "homepage": "https://github.com/zinongli/KeyCopier"
+  }
+}
