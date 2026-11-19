@@ -2,8 +2,8 @@
   "extra": {
     "id": "gps_speedo",
     "name": "GPS Speedometer",
-    "author": "WDGo",
-    "version": "1.0.0",
+    "author": "LOCOSP",
+    "version": "1.0.1",
     "api": 1,
     "entry": "main:Extra",
     "permissions": ["gps"],
