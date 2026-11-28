@@ -1,0 +1,31 @@
+{
+  "extra": {
+    "id": "drive_hud",
+    "name": "Drive HUD",
+    "author": "aedilis",
+    "version": "1.0.4",
+    "api": 2,
+    "entry": "main:Extra",
+    "permissions": [
+      "gps",
+      "loot_read"
+    ],
+    "hardware": [
+      "gps",
+      "esp32"
+    ],
+    "category": "tools",
+    "tags": [
+      "wardrive",
+      "hud",
+      "car",
+      "gps",
+      "stats",
+      "speed"
+    ],
+    "description": "Big glanceable wardrive stats for the car: nets/min, nets/mile, speed.",
+    "about": "A heads-up display for wardriving, built to be read at a glance on a car screen or tablet. Six large tiles: speed, networks found this trip, networks per minute (last 60 s, with your best), networks per mile or km, distance driven and trip time, plus a sparkline of new networks per 30 seconds over the last 10 minutes. Distance comes from your GPS fix with jitter and jump filtering; network counts come from the game's loot. The trip is saved, so it carries on if you leave the screen or restart the game (networks found while the screen was closed are still counted; distance only accumulates while it is open). Keys: [U] switch miles / kilometres, [R] start a new trip. Needs a running WiFi wardrive for the network numbers and a GPS fix for speed and distance. Read-only: it never writes to your loot.",
+    "homepage": "",
+    "icon": "icon.png"
+  }
+}
