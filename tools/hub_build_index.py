@@ -13,6 +13,12 @@ an extra only when its files hash to exactly this value, and only when index.jso
 carries a valid signature. Output is deterministic (sorted keys, no timestamps),
 so an unchanged hub produces a byte-identical index.
 
+`catalog_seq` is the release number the game uses against rollback (an older
+signed catalogue replayed to a device is refused). It comes from the last signed
+release in <hub-root>/index.json: the same number while the candidate is
+byte-identical to that release, +1 for any change, 1 for the first numbered
+release. An unreadable release or a bad number stops the build.
+
 """
 import json
 import os
@@ -90,12 +96,58 @@ def main():
                 print("SKIP  %s: %s" % (eid, exc))
                 sys.exit(1)
         print("ok    %-20s v%-8s %s" % (m.id, m.version, extras[m.id]["sha"][:16]))
+    doc = {"schema": 1, "extras": extras}
+    try:
+        doc["catalog_seq"] = _catalog_seq(os.path.join(root, "index.json"), doc)
+    except ValueError as exc:
+        print("FAIL  %s" % exc)
+        sys.exit(1)
     out = out_rel if os.path.isabs(out_rel) else os.path.join(root, out_rel)
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump({"schema": 1, "extras": extras}, f, indent=1, sort_keys=True, ensure_ascii=True)
-        f.write("\n")
-    print("wrote %s (%d extras)" % (out, len(extras)))
+    with open(out, "w", encoding="utf-8", newline="\n") as f:
+        f.write(_dump(doc))
+    print("wrote %s (%d extras, release %d)" % (out, len(extras), doc["catalog_seq"]))
+
+
+SEQ_MAX = 2 ** 53 - 1      # stays exact in every JSON reader; the game accepts up to 2**64-1
+
+
+def _dump(doc) -> str:
+    return json.dumps(doc, indent=1, sort_keys=True, ensure_ascii=True) + "\n"
+
+
+def _catalog_seq(released_path, doc):
+    """Release number for the game's anti-rollback check, derived only from the
+    last signed release (<hub-root>/index.json), so CI and the maintainer's local
+    rebuild get the same bytes:
+      - no release yet, or a release from before numbering -> 1;
+      - the candidate is byte-identical to the release at its number -> that number;
+      - anything else changed -> the next number.
+    A release file that cannot be read or carries a bad number stops the build
+    (ValueError) instead of silently restarting at 1, which devices would refuse."""
+    try:
+        with open(released_path, "rb") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        return 1
+    except OSError as exc:
+        raise ValueError("cannot read the released index.json (%s)" % exc)
+    try:
+        prev = json.loads(raw.decode("utf-8"))
+    except ValueError:
+        raise ValueError("the released index.json is not valid JSON - refusing to number a release")
+    if not isinstance(prev, dict):
+        raise ValueError("the released index.json is not a catalogue - refusing to number a release")
+    if "catalog_seq" not in prev:
+        return 1                                  # first numbered release
+    seq = prev["catalog_seq"]
+    if not isinstance(seq, int) or isinstance(seq, bool) or not 1 <= seq <= SEQ_MAX:
+        raise ValueError("the released index.json has a bad catalog_seq - refusing")
+    if _dump(dict(doc, catalog_seq=seq)).encode("utf-8") == raw:
+        return seq
+    if seq >= SEQ_MAX:
+        raise ValueError("catalog_seq is at its limit - refusing")
+    return seq + 1
 
 
 if __name__ == "__main__":

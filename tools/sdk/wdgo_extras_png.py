@@ -26,18 +26,42 @@ _SIG = b"\x89PNG\r\n\x1a\n"
 _CHANNELS = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
 
 
-def check_icon(data: bytes):
-    """The listing icon must be tiny. Returns (w, h); raises ValueError."""
-    if len(data) > ICON_MAX_BYTES:
-        raise ValueError("icon.png is %d bytes - the limit is %d" % (len(data), ICON_MAX_BYTES))
-    w, h, _ = decode(data)
-    if w > ICON_MAX_PX or h > ICON_MAX_PX:
-        raise ValueError("icon.png is %dx%d - the limit is %dx%d" % (w, h, ICON_MAX_PX, ICON_MAX_PX))
+def header(data: bytes):
+    """(width, height) from the IHDR chunk alone - no inflation, no pixel work.
+    Raises ValueError when the file does not start like a PNG."""
+    if not isinstance(data, (bytes, bytearray)) or len(data) < 33 or data[:8] != _SIG:
+        raise ValueError("not a PNG file")
+    (n,) = struct.unpack(">I", data[8:12])
+    if n != 13 or data[12:16] != b"IHDR":
+        raise ValueError("bad PNG (no header first)")
+    if zlib.crc32(data[12:29]) & 0xFFFFFFFF != struct.unpack(">I", data[29:33])[0]:
+        raise ValueError("corrupt PNG (checksum)")
+    w, h = struct.unpack(">II", data[16:24])
     return w, h
 
 
-def decode(data: bytes):
-    """PNG bytes -> (width, height, rgba_bytes). Raises ValueError."""
+def decode_icon(data: bytes):
+    """The listing icon: (w, h, rgba), decoded ONCE. Byte and pixel limits are
+    enforced before anything is inflated. Raises ValueError."""
+    if not isinstance(data, (bytes, bytearray)) or len(data) > ICON_MAX_BYTES:
+        raise ValueError("icon.png is %d bytes - the limit is %d"
+                         % (len(data) if isinstance(data, (bytes, bytearray)) else -1, ICON_MAX_BYTES))
+    w, h = header(data)
+    if not (1 <= w <= ICON_MAX_PX and 1 <= h <= ICON_MAX_PX):
+        raise ValueError("icon.png is %dx%d - the limit is %dx%d" % (w, h, ICON_MAX_PX, ICON_MAX_PX))
+    return decode(data, max_px=ICON_MAX_PX)
+
+
+def check_icon(data: bytes):
+    """The listing icon must be tiny. Returns (w, h); raises ValueError."""
+    w, h, _ = decode_icon(data)
+    return w, h
+
+
+def decode(data: bytes, max_px: int = IMG_MAX_PX):
+    """PNG bytes -> (width, height, rgba_bytes). Raises ValueError. `max_px` (at most
+    IMG_MAX_PX) is checked at the header, before any pixel data is inflated."""
+    max_px = max(1, min(IMG_MAX_PX, int(max_px)))
     if not isinstance(data, (bytes, bytearray)) or len(data) > IMG_MAX_BYTES:
         raise ValueError("image larger than %d bytes" % IMG_MAX_BYTES)
     if data[:8] != _SIG:
@@ -60,8 +84,8 @@ def decode(data: bytes):
             if n != 13 or w:
                 raise ValueError("bad PNG header")
             w, h, depth, ctype, comp, flt, lace = struct.unpack(">IIBBBBB", body)
-            if not (1 <= w <= IMG_MAX_PX and 1 <= h <= IMG_MAX_PX):
-                raise ValueError("image is %dx%d - the limit is %dx%d" % (w, h, IMG_MAX_PX, IMG_MAX_PX))
+            if not (1 <= w <= max_px and 1 <= h <= max_px):
+                raise ValueError("image is %dx%d - the limit is %dx%d" % (w, h, max_px, max_px))
             if ctype not in _CHANNELS or comp or flt or not (
                     depth == 8 or (depth in (1, 2, 4) and ctype in (0, 3))):
                 raise ValueError("unsupported PNG format (need 8-bit grey/RGB/RGBA, "

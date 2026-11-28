@@ -6,8 +6,10 @@ Started by wdgo_extras_sandbox.SandboxHost as a fresh interpreter:
 
 Order matters and is the whole point of this file:
 
-  1. (still root, trusted code only) read the "hello", load the extra's sources
-     into memory and verify their hash, pre-import the allowed stdlib modules.
+  1. (still root, trusted code only) read the "hello" and the extra's sources,
+     which the host SENDS over the socket (the approved snapshot - this process
+     never reads the extra's folder), verify their exact hash, check that the
+     parent is the game that started us, pre-import the allowed stdlib modules.
   2. LOCK DOWN — new network/IPC/UTS namespaces, rlimits, chroot into an empty
      root-owned directory, drop to a dedicated unprivileged uid/gid for good,
      no_new_privs, die-with-parent.
@@ -19,7 +21,8 @@ loaded fails — the pre-import list IS the stdlib allowlist), no network, no
 ability to fork, no way back to root, and exactly one file descriptor that
 matters: the socket to the host. The host validates everything sent over it.
 
-If lockdown is required and any step fails, no extra code is ever executed.
+If lockdown is required and any step fails, no extra code is ever executed. A
+process started as root never runs extra code without the full jail.
 """
 import os
 import sys
@@ -75,18 +78,41 @@ def _pin_timezone():
         pass
 
 
+_PR_SET_PDEATHSIG, _PR_GET_PDEATHSIG, _PR_SET_DUMPABLE, _PR_SET_NO_NEW_PRIVS = 1, 2, 4, 38
+
+
+def _arm_pdeathsig(libc=None) -> bool:
+    """Ask the kernel to SIGKILL us when the game dies; True when confirmed."""
+    if not sys.platform.startswith("linux"):
+        return False
+    try:
+        import ctypes
+        import signal
+        libc = libc or ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(_PR_SET_PDEATHSIG, int(signal.SIGKILL), 0, 0, 0) != 0:
+            return False
+        got = ctypes.c_int(0)
+        if libc.prctl(_PR_GET_PDEATHSIG, ctypes.byref(got), 0, 0, 0) != 0:
+            return False
+        return got.value == int(signal.SIGKILL)
+    except Exception:
+        return False
+
+
 def _lockdown(hello, ipc_fd, ppid0) -> dict:
     """Establish the kernel jail. Returns {"level": "full"|"none"|"failed", "why": str}.
-    "none" = this platform cannot jail (desktop simulator); "failed" = it should have
-    worked and did not. Only "full" is acceptable when the host requires isolation."""
+    "none" = this platform cannot jail (desktop simulator, never root); "failed" = it
+    should have worked and did not. Only "full" is acceptable when the host requires
+    isolation, and always when this process is root."""
     if not sys.platform.startswith("linux"):
+        if os.geteuid() == 0:
+            return {"level": "failed", "why": "cannot isolate a root process on this platform"}
         return {"level": "none", "why": "not Linux"}
     if os.geteuid() != 0:
         return {"level": "none", "why": "not started as root"}
     step = "init"
     try:
         import resource
-        import signal
         import stat
         uid, gid = int(hello["uid"]), int(hello["gid"])
         jail = str(hello["jail"])
@@ -158,14 +184,15 @@ def _lockdown(hello, ipc_fd, ppid0) -> dict:
             raise OSError("filesystem is still visible")
 
         step = "prctl"
-        if libc.prctl(38, 1, 0, 0, 0) != 0:                 # PR_SET_NO_NEW_PRIVS
+        if libc.prctl(_PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0:
             raise OSError("no_new_privs failed")
-        libc.prctl(4, 0, 0, 0, 0)                           # PR_SET_DUMPABLE = 0
-        libc.prctl(1, int(signal.SIGKILL), 0, 0, 0)         # PR_SET_PDEATHSIG
-        # Race guard: if the host died between fork and the prctl above, pdeathsig
-        # never armed. Detect it by the parent pid CHANGING from the one we recorded
-        # at startup (reparented to init). Comparing to a literal "1" is wrong when
-        # the host legitimately is pid 1 (e.g. inside a container).
+        if libc.prctl(_PR_SET_DUMPABLE, 0, 0, 0, 0) != 0:
+            raise OSError("set_dumpable failed")
+        # The uid change above cleared any earlier death signal: arm it again (and
+        # confirm it took), then re-check the parent. If the game died before the
+        # signal was armed we were re-parented, and must not go on.
+        if not _arm_pdeathsig(libc):
+            raise OSError("parent-death signal could not be armed")
         if os.getppid() != ppid0:
             _die(0)
         return {"level": "full", "why": "chroot+uid %d+netns+rlimits" % uid}
@@ -237,6 +264,50 @@ def _describe(exc, prefix) -> str:
     return ("%s: %s%s" % (type(exc).__name__, msg[:200], where))[:300]
 
 
+def _receive_sources(hello, recv_msg, wx, base64) -> dict:
+    """Collect the approved sources the host sends after the hello:
+    hello.src = [[relpath, size], ...], then {"t":"src", "i", "o", "b": base64}
+    chunks in order. Every bound the host's collect_sources() applies is applied
+    again here; any deviation raises."""
+    table = hello.get("src")
+    if not isinstance(table, list) or not table or len(table) > wx.SRC_MAX_FILES:
+        raise ValueError("bad source table")
+    names, sizes, total = [], [], 0
+    for ent in table:
+        if not (isinstance(ent, list) and len(ent) == 2 and isinstance(ent[0], str)
+                and isinstance(ent[1], int) and not isinstance(ent[1], bool)):
+            raise ValueError("bad source table entry")
+        rel, size = ent
+        parts = rel.split("/")
+        if (len(rel) > 256 or len(parts) > 4 or rel in names
+                or any(not p or p.startswith(".") or "\x00" in p or "\\" in p for p in parts)
+                or not (rel.endswith(".py") or rel.endswith(".png") or rel == "extra.json")):
+            raise ValueError("bad source name %r" % rel[:80])
+        if not 0 <= size <= wx.SRC_MAX_FILE_BYTES:
+            raise ValueError("bad source size")
+        total += size
+        if total > wx.SRC_MAX_TOTAL_BYTES:
+            raise ValueError("sources too large")
+        names.append(rel)
+        sizes.append(size)
+    bufs = [bytearray() for _ in names]
+    fi = 0
+    while True:
+        while fi < len(names) and len(bufs[fi]) == sizes[fi]:
+            fi += 1
+        if fi >= len(names):
+            break
+        msg = recv_msg()
+        if msg.get("t") != "src" or msg.get("i") != fi or msg.get("o") != len(bufs[fi]) \
+                or not isinstance(msg.get("b"), str):
+            raise ValueError("out-of-order source data")
+        part = base64.b64decode(msg["b"], validate=True)
+        if not part or len(bufs[fi]) + len(part) > sizes[fi]:
+            raise ValueError("source data larger than announced")
+        bufs[fi] += part
+    return {rel: bytes(b) for rel, b in zip(names, bufs)}
+
+
 def main():
     import socket
     ppid0 = os.getppid()          # the host game process; used for the pdeathsig race guard
@@ -253,6 +324,7 @@ def main():
 
     framer = ipc.Framer()
     inbox = collections.deque()
+    _arm_pdeathsig()              # while still root; re-armed after the uid change
 
     def recv_msg():
         while not inbox:
@@ -280,10 +352,13 @@ def main():
     hello = recv_msg()
     if hello.get("t") != "hello" or hello.get("proto") != ipc.PROTO:
         _die(2)
+    hp = hello.get("host_pid")
+    if not isinstance(hp, int) or isinstance(hp, bool) or hp != ppid0:
+        _die(2)                   # not started by the game that is talking to us
     try:
-        src = wx.collect_sources(hello["dir"])
+        src = _receive_sources(hello, recv_msg, wx, base64)
         if wx.sources_hash(src) != hello["sha"]:
-            raise ValueError("extra changed on disk while starting")
+            raise ValueError("sources do not match the approved fingerprint")
         entry_file = str(hello["entry_file"])
         entry_symbol = str(hello["entry_symbol"])
         entry_src = src[entry_file].decode("utf-8")
@@ -296,8 +371,10 @@ def main():
     _pin_timezone()
 
     # ---- 2. lock down -------------------------------------------------------
+    started_as_root = os.geteuid() == 0
     iso = _lockdown(hello, ipc_fd, ppid0)
-    if iso["level"] != "full" and (hello.get("iso") or iso["level"] != "none"):
+    if iso["level"] != "full" and (hello.get("iso") or iso["level"] != "none"
+                                   or started_as_root or os.geteuid() == 0):
         send({"t": "ready", "iso": iso})          # host will refuse and kill us
         _die(1)
     _scrub()
