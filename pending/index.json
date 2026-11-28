@@ -1,6 +1,29 @@
 {
  "catalog_seq": 1,
  "extras": {
+  "drive_hud": {
+   "api": 2,
+   "author": "aedilis",
+   "category": "tools",
+   "description": "Big glanceable wardrive stats for the car: nets/min, nets/mile, speed.",
+   "homepage": "",
+   "icon": true,
+   "name": "Drive HUD",
+   "permissions": [
+    "gps",
+    "loot_read"
+   ],
+   "sha": "b56fd63c6d6d07a7b61656fd831b3cbdd3ee260fcb26467eb56fc3c6ce22c8d1",
+   "tags": [
+    "wardrive",
+    "hud",
+    "car",
+    "gps",
+    "stats",
+    "speed"
+   ],
+   "version": "1.0.4"
+  },
   "gps_speedo": {
    "api": 2,
    "author": "LOCOSP",
@@ -61,6 +84,30 @@
     "physical"
    ],
    "version": "1.3.2"
+  },
+  "surveillance_spotter": {
+   "api": 2,
+   "author": "aedilis",
+   "category": "tools",
+   "description": "Flags Flock ALPR cameras and surveillance gear in your wardrive, with GPS.",
+   "homepage": "",
+   "icon": true,
+   "name": "Surveillance Spotter",
+   "permissions": [
+    "gps",
+    "loot_read",
+    "loot_write"
+   ],
+   "sha": "7cbc199dce5cfe21f554b2af0a68203cff7b9a08415094e16c5af0dfc25aa1f9",
+   "tags": [
+    "flock",
+    "alpr",
+    "surveillance",
+    "wardrive",
+    "gps",
+    "privacy"
+   ],
+   "version": "1.0.4"
   }
  },
  "schema": 1
