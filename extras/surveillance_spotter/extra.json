@@ -1,0 +1,32 @@
+{
+  "extra": {
+    "id": "surveillance_spotter",
+    "name": "Surveillance Spotter",
+    "author": "aedilis",
+    "version": "1.0.4",
+    "api": 2,
+    "entry": "main:Extra",
+    "permissions": [
+      "gps",
+      "loot_read",
+      "loot_write"
+    ],
+    "hardware": [
+      "gps",
+      "esp32"
+    ],
+    "category": "tools",
+    "tags": [
+      "flock",
+      "alpr",
+      "surveillance",
+      "wardrive",
+      "gps",
+      "privacy"
+    ],
+    "description": "Flags Flock ALPR cameras and surveillance gear in your wardrive, with GPS.",
+    "about": "Watches the networks your WiFi wardrive collects and flags Flock Safety ALPR cameras and related surveillance hardware, with the GPS position of each sighting. Detection is tiered because a vendor MAC prefix alone is not proof of a camera: CONFIRMED = the SSID names the device (Flock, Flock-XXXXXX, Penguin, Pigvision, FS Ext Battery); SUSPECT = a MAC prefix tied to Flock hardware; KEYWORD = an SSID containing one of your own watch words; WEAK = contract-manufacturer prefixes (Liteon, Silicon Labs, USI) that also appear on lots of unrelated devices, hidden unless you turn them on. Known look-alikes (ClickShare, WiFi-Direct printers, Android hotspots, other detectors' 'Flock ALPR' output) are excluded first. New hits pop a large alert and are logged to the game terminal. Every sighting is remembered across sessions (first/last seen, times seen, and the last position a GPS fix was available, with the time it was taken), so you can track devices over time. Positions are only taken when a network first shows up while this screen is open; networks that were already in the wardrive list when you open it are logged as backlog without a position, and are never re-counted or moved. Keys: [K] add a watch word, [X] remove the last one, [W] toggle weak vendor matches, [E] export all sightings as CSV to loot/extras/surveillance_spotter/ (text that a spreadsheet would run as a formula is neutralised), [C] clear the session list, [UP]/[DOWN] scroll. Needs a running WiFi wardrive; GPS is optional (hits without a fix are logged without a position). Passive only: it reads what your scan already collected and transmits nothing.",
+    "homepage": "",
+    "icon": "icon.png"
+  }
+}
